@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualize Global COVID 19 Status</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css">
+    <script src='https://cdn.plot.ly/plotly-latest.min.js'></script>
+    <style>
+.mainbody{
+    padding-top: 3em;
+}
+.mainbody h3{
+    padding-top: 1em;
+}
+.selectedregions{
+    font-size: 1.4em;
+}
+.selectedregions .badge a{
+    padding: 0 0.5em;
+}
+.plotarea{
+    width: 98%;
+    margin: auto;
+}
+    </style>
+</head>
+<body>
+    <header>
+        <div class="navbar navbar-dark bg-dark shadow-sm">
+          <div class="container d-flex justify-content-between">
+            <a href="#" class="navbar-brand d-flex align-items-center">
+              <strong>Visualize Global COVID 19 Status</strong>
+            </a>
+          </div>
+        </div>
+    </header>
+    <div class="container mainbody">
+        <p><a class="btn btn-primary" data-toggle="collapse" href="#regionList" role="button" aria-expanded="false" aria-controls="collapseExample">Show Regions</a></p>
+        <div class="row region_cards collapse" id="regionList">
+        </div>
+        <h3>Selected regions</h3>
+        <div class="selectedregions">
+        </div>
+        <div><button class="btn btn-primary" id="goBtn">Go</button></div>
+    </div>
+    <div class="plotarea row"></div>
+    <script src="js/all_regions.js"></script>
+    <script>
+var selected_region = ['hongkong', 'china', 'unitedkingdom'];
+var saved_data = {};
+var saved_loc = {}
+
+// Handle the hash
+if (window.location.hash.substr(1) !== ''){
+    var temp_region = window.location.hash.substr(1).split(';');
+    console.log(temp_region);
+    var final_selection = [];
+    for (var i=0; i<temp_region.length; i++){
+        if (temp_region[i] in regionName){
+            final_selection.push(temp_region[i]);
+        }
+    }
+    selected_region = final_selection;
+}
+
+function loadData(trend, geo, name){
+    if(!(name in saved_data)){
+        saved_data[name] = trend;
+    }
+    if(!(name in saved_loc)){
+        saved_loc[name] = geo;
+    }
+    checkReady();
+}
+
+function checkReady(){
+    var checking = true;
+    for(var i = 0; i < selected_region.length; i++){
+        if(! (selected_region[i] in saved_data)){
+            checking = false;
+        }
+    }
+
+    if(checking){
+        startPlot();
+    }
+}
+
+function plotGraphs(region){
+    var date = saved_data[region]['date'].map(function(x){
+        return new Date(x * 1000);
+    });
+
+    var trace1 = {
+        x: date,
+        y: saved_data[region]['death_rate'],
+        type: 'scatter',
+        name: 'Percentage of Death'
+    };
+
+    var trace2 = {
+        x: date,
+        y: saved_data[region]['recovered_rate'],
+        type: 'scatter',
+        name: 'Percentage of Recovered'
+    };
+
+    var trace3 = {
+        x: date,
+        y: saved_data[region]['finished_percentage'],
+        type: 'scatter',
+        name: 'Percentage of terminated cases'
+    };
+
+    var data = [trace1, trace2, trace3];
+
+    Plotly.newPlot(region+'_trend', data);
+
+    var lat_long_data = [
+        {
+            type: "scattermapbox",
+            text: ['Hong Kong'],
+            lon: saved_loc[region].map(function(x){
+                return x['Long']
+            }),
+            lat: saved_loc[region].map(function(x){
+                return x['Lat']
+            }),
+            marker: { color: "fuchsia", size: 10 }
+        }
+    ];
+
+    var layout = {
+        dragmode: "zoom",
+        mapbox: { style: "open-street-map", center: { lat: saved_loc[region][0]['Lat'], lon: saved_loc[region][0]['Long'] }, zoom: 1 },
+        margin: { r: 0, t: 0, b: 0, l: 0 }
+    };
+
+    Plotly.newPlot(region+'_map', lat_long_data, layout);
+}
+
+function startPlot(){
+    for(var i = 0; i < selected_region.length; i++){
+        plotGraphs(selected_region[i]);
+    }
+}
+
+function addBadge(name){
+    var b_html = '<span class="badge badge-success" data-region="'+name+'">'+ 
+        regionName[name] + 
+        ' <a href="#"><img src="img/x.svg"></a></span> ';
+    $(".selectedregions").append(b_html);
+}
+
+function addRegionBtn(e){
+    var selectedRegion = $(e.target).data('region');
+    var currentSelections = $(".selectedregions span").map(function(x,y) {
+        return (y.dataset.region === selectedRegion);
+    });
+
+    if (Math.max(...currentSelections) === 0){
+        addBadge(selectedRegion);
+    }else{
+        alert(regionName[selectedRegion] + ' is already selected');
+    }
+}
+
+function loadJS(name){
+    var script = document.createElement('script');
+    script.src = 'js/'+name+'.js';
+    document.body.appendChild(script);
+}
+
+function loadMissing(){
+    $(".plotarea").html('');
+    var html;
+    for(var i = 0; i < selected_region.length; i++){
+        if(! (selected_region[i] in saved_data)){
+            loadJS(selected_region[i]);
+        }
+        // Add div for region
+        html = '<div class="col-md-6 col-lg-4 plots"><h3>'+regionName[selected_region[i]]+'</h3>'
+        html += '<div id="'+selected_region[i]+'_map"></div>'
+        html += '<div id="'+selected_region[i]+'_trend"></div></div>'
+        $(".plotarea").append(html);
+    }
+}
+
+function goBotton(){
+    var currentSelections = $.makeArray($(".selectedregions span"))
+        .map(function(x) {
+            return x.dataset.region;
+        });
+
+    selected_region = currentSelections;
+    window.location.hash = currentSelections.join(';');
+    refreshBadge();
+    loadMissing();
+}
+
+function refreshBadge(){
+    $(".selectedregions a").unbind('click');
+    $(".selectedregions a").click(function(e){
+        $(e.target).parent().find('img').parent().parent().remove();
+    });
+}
+
+function addRegion(){
+    for(name in regionName){
+        var btn_html = '<div class="col-md-4"><div class="card"><div class="card-body">' + 
+            '<button class="btn btn-dark" data-region="'+name+'">Add</button>' + 
+            ' '+ regionName[name] + '</div></div></div>';
+        $(".region_cards").append(btn_html)
+    }
+
+    for(i in selected_region){
+        addBadge(selected_region[i]);
+    }
+
+    refreshBadge();
+
+    // Add events for cards
+    $(".card button").click(addRegionBtn);
+    $("#goBtn").click(goBotton);
+}
+
+loadMissing();
+addRegion();
+    </script>
+</body>
+</html>
